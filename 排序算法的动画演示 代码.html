@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>排序算法可视化</title>
+    <style>
+        body {
+            background-color: #1c1c1c;
+            color: #e0e0e0;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+        }
+        h2 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: #ffffff;
+            width: 100%;
+        }
+        .control-btn, .algo-btn {
+            padding: 10px 20px;
+            background-color: #444444;
+            border: none;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 5px;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        .control-btn:hover, .algo-btn:hover {
+            background-color: #666666;
+        }
+        .algo-btn.active {
+            background-color: #ffffff;
+            color: #000000;
+        }
+        input[type="number"], input[type="range"] {
+            width: 80px;
+            padding: 5px;
+            font-size: 16px;
+            color: #ffffff;
+            background-color: #444444;
+            border: none;
+            border-radius: 4px;
+        }
+        .pseudo-code {
+            background-color: #333333;
+            padding: 10px;
+            margin-bottom: 20px;
+            color: #ffffff;
+            border-radius: 4px;
+            height: 200px;
+            overflow-y: auto;
+            width: 100%;
+        }
+        pre {
+            font-size: 14px;
+            line-height: 1.5;
+            margin: 0;
+        }
+        .pseudo-line {
+            padding: 2px 4px;
+            margin: 2px 0;
+            border-radius: 2px;
+            transition: background-color 0.1s ease;
+        }
+        .highlight {
+            background-color: #ffffff;
+            color: #000000;
+        }
+        #sortCanvas {
+            border: 1px solid #444444;
+            margin-top: 20px;
+            width: 100%;
+            height: 300px;
+        }
+        #metrics {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            width: 100%;
+        }
+        .metric {
+            background-color: #333333;
+            padding: 10px;
+            border-radius: 4px;
+            flex: 1;
+            margin: 0 5px;
+            text-align: center;
+        }
+        #custom-input {
+            width: 100%;
+            height: 100px;
+            margin-top: 10px;
+            background-color: #333333;
+            color: #ffffff;
+            border: none;
+            border-radius: 4px;
+            padding: 10px;
+        }
+        #controls {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        #controls > * {
+            margin: 5px;
+        }
+        #algorithm-selection {
+            display: flex;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        #comparison {
+            width: 100%;
+            margin-top: 20px;
+        }
+        #comparisonResults {
+            width: 100%;
+            height: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>排序算法可视化</h2>
+
+        <div id="algorithm-selection">
+            <button class="algo-btn" onclick="selectAlgorithm('bubbleSort')">冒泡排序</button>
+            <button class="algo-btn" onclick="selectAlgorithm('quickSort')">快速排序</button>
+            <button class="algo-btn" onclick="selectAlgorithm('insertionSort')">插入排序</button>
+            <button class="algo-btn" onclick="selectAlgorithm('shellSort')">希尔排序</button>
+            <button class="algo-btn" onclick="selectAlgorithm('selectionSort')">选择排序</button>
+            <button class="algo-btn" onclick="selectAlgorithm('heapSort')">堆排序</button>
+        </div>
+
+        <canvas id="sortCanvas"></canvas>
+
+        <div id="controls">
+            <label for="sampleInput">样本数:</label>
+            <input type="number" id="sampleInput" min="10" max="200" value="50">
+            <button class="control-btn" id="startSort">开始排序</button>
+            <button class="control-btn" id="pauseSort">暂停排序</button>
+            <button class="control-btn" id="stepSort">单步执行</button>
+            <button class="control-btn" id="randomData">生成随机数据</button>
+            <button class="control-btn" id="useCustomData">使用自定义数据</button>
+            <label for="speedControl">速度:</label>
+            <input type="range" id="speedControl" min="1" max="1000" value="500">
+        </div>
+
+        <div class="pseudo-code">
+            <h2>伪代码展示</h2>
+            <pre id="pseudoCode">
+                <code></code>
+            </pre>
+        </div>
+
+        <textarea id="custom-input" placeholder="输入自定义数据，用逗号分隔"></textarea>
+
+        <div id="metrics">
+            <div class="metric">
+                <h3>执行时间</h3>
+                <p id="execution-time">0 ms</p>
+            </div>
+            <div class="metric">
+                <h3>比较次数</h3>
+                <p id="comparison-count">0</p>
+            </div>
+            <div class="metric">
+                <h3>交换次数</h3>
+                <p id="swap-count">0</p>
+            </div>
+        </div>
+
+        <div id="comparison">
+            <h2>排序算法比较</h2>
+            <div id="comparisonResults"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const canvas = document.getElementById("sortCanvas");
+        const ctx = canvas.getContext("2d");
+        let array = [];
+        let isSorting = false;
+        let isPaused = false;
+        let isStepMode = false;
+        let startTime, endTime;
+        let currentAlgo = 'bubbleSort';
+        let sortTimes = {};
+        let comparisonCount = 0;
+        let swapCount = 0;
+        let currentSortingAlgorithm = null;
+        let animationSpeed = 500;
+        let lastHighlightedLine = null;
+
+        const pseudoCodeMap = {
+            bubbleSort: [
+                "procedure bubbleSort(A : list of sortable items)",
+                "    n = length(A)",
+                "    for i = 1 to n - 1",
+                "        for j = 0 to n - i - 1",
+                "            if A[j] > A[j + 1]",
+                "                swap(A[j], A[j + 1])"
+            ],
+            quickSort: [
+                "procedure quickSort(A, low, high)",
+                "    if low < high",
+                "        pivotIndex = partition(A, low, high)",
+                "        quickSort(A, low, pivotIndex - 1)",
+                "        quickSort(A, pivotIndex + 1, high)",
+                "",
+                "procedure partition(A, low, high)",
+                "    pivot = A[high]",
+                "    i = low - 1",
+                "    for j = low to high - 1",
+                "        if A[j] <= pivot",
+                "            i = i + 1",
+                "            swap(A[i], A[j])",
+                "    swap(A[i + 1], A[high])",
+                "    return i + 1"
+            ],
+            insertionSort: [
+                "procedure insertionSort(A : list of sortable items)",
+                "    n = length(A)",
+                "    for i = 1 to n - 1",
+                "        key = A[i]",
+                "        j = i - 1",
+                "        while j >= 0 and A[j] > key",
+                "            A[j + 1] = A[j]",
+                "            j = j - 1",
+                "        A[j + 1] = key"
+            ],
+            shellSort: [
+                "procedure shellSort(A : list of sortable items)",
+                "    n = length(A)",
+                "    gap = n / 2",
+                "    while gap > 0",
+                "        for i = gap to n - 1",
+                "            temp = A[i]",
+                "            j = i",
+                "            while j >= gap and A[j - gap] > temp",
+                "                A[j] = A[j - gap]",
+                "                j = j - gap",
+                "            A[j] = temp",
+                "        gap = gap / 2"
+            ],
+            selectionSort: [
+                "procedure selectionSort(A : list of sortable items)",
+                "    n = length(A)",
+                "    for i = 0 to n - 1",
+                "        minIndex = i",
+                "        for j = i + 1 to n - 1",
+                "            if A[j] < A[minIndex]",
+                "                minIndex = j",
+                "        if minIndex != i",
+                "            swap(A[i], A[minIndex])"
+            ],
+            heapSort: [
+                "procedure heapSort(A : list of sortable items)",
+                "    n = length(A)",
+                "    buildMaxHeap(A)",
+                "    for i = n - 1 to 1",
+                "        swap(A[0], A[i])",
+                "        heapify(A, 0, i)",
+                "",
+                "procedure buildMaxHeap(A)",
+                "    n = length(A)",
+                "    for i = n/2 - 1 to 0",
+                "        heapify(A, i, n)",
+                "",
+                "procedure heapify(A, i, n)",
+                "    largest = i",
+                "    left = 2i + 1",
+                "    right = 2i + 2",
+                "    if left < n and A[left] > A[largest]",
+                "        largest = left",
+                "    if right < n and A[right] > A[largest]",
+                "        largest = right",
+                "    if largest != i",
+                "        swap(A[i], A[largest])",
+                "        heapify(A, largest, n)"
+            ]
+        };
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, Math.max(10, 1000 - animationSpeed)));
+        }
+
+        function compare(a, b) {
+            comparisonCount++;
+            return a - b;
+        }
+
+        function swap(i, j) {
+            swapCount++;
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+
+        function drawArray(highlightIndices = []) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const barWidth = Math.max(1, canvas.width / array.length - 1);
+            const maxValue = Math.max(...array);
+            array.forEach((value, index) => {
+                const barHeight = (value / maxValue) * (canvas.height - 30);
+                const hue = (value / maxValue) * 240;
+                ctx.fillStyle = highlightIndices.includes(index) ? 'red' : `hsl(${hue}, 100%, 50%)`;
+                ctx.fillRect(index * (barWidth + 1), canvas.height - barHeight - 20, barWidth, barHeight);
+                ctx.fillStyle = 'white';
+                ctx.font = '10px Arial';
+                ctx.fillText(value, index * (barWidth + 1), canvas.height - 5);
+            });
+        }
+
+        function displayPseudoCode(algo) {
+            const pseudoCode = pseudoCodeMap[algo];
+            const codeElement = document.querySelector("#pseudoCode code");
+            codeElement.innerHTML = pseudoCode.map((line, index) => 
+                `<span class="pseudo-line" data-line="${index + 1}">${line}</span>`
+            ).join('<br>');
+        }
+
+        async function highlightLine(lineNumber) {
+            if (lastHighlightedLine) {
+                lastHighlightedLine.classList.remove("highlight");
+            }
+            const lineEl = document.querySelector(`.pseudo-line[data-line="${lineNumber}"]`);
+            if (lineEl) {
+                lineEl.classList.add("highlight");
+                lastHighlightedLine = lineEl;
+                lineEl.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+            }
+            await sleep(10);
+        }
+
+        async function* bubbleSort() {
+            const n = array.length;
+            for (let i = 0; i < n - 1; i++) {
+                for (let j = 0; j < n - i - 1; j++) {
+                    await highlightLine(4);
+                    if (compare(array[j], array[j + 1]) > 0) {
+                        await highlightLine(5);
+                        swap(j, j + 1);
+                        await highlightLine(6);
+                        drawArray([j, j + 1]);
+                        yield;
+                    }
+                }
+            }
+        }
+
+        async function* quickSort(low = 0, high = array.length - 1) {
+            if (low < high) {
+                await highlightLine(2);
+                const pivotIndex = yield* partition(low, high);
+                await highlightLine(3);
+                yield* quickSort(low, pivotIndex - 1);
+                await highlightLine(4);
+                yield* quickSort(pivotIndex + 1, high);
+            }
+        }
+
+        async function* partition(low, high) {
+            await highlightLine(8);
+            const pivot = array[high];
+            let i = low - 1;
+            await highlightLine(9);
+
+            for (let j = low; j < high; j++) {
+                await highlightLine(10);
+                if (compare(array[j], pivot) <= 0) {
+                    i++;
+                    await highlightLine(12);
+                    swap(i, j);
+                    await highlightLine(13);
+                    drawArray([i, j, high]);
+                    yield;
+                }
+            }
+            await highlightLine(14);
+            swap(i + 1, high);
+            drawArray([i + 1, high]);
+            yield;
+            await highlightLine(15);
+            return i + 1;
+        }
+
+        async function* insertionSort() {
+            const n = array.length;
+            await highlightLine(2);
+            for (let i = 1; i < n; i++) {
+                await highlightLine(3);
+                let key = array[i];
+                await highlightLine(4);
+                let j = i - 1;
+                await highlightLine(5);
+                while (j >= 0 && compare(array[j], key) > 0) {
+                    await highlightLine(6);
+                    array[j + 1] = array[j];
+                    await highlightLine(7);
+                    drawArray([j, j + 1]);
+                    yield;
+                    j--;
+                    await highlightLine(8);
+                }
+                array[j + 1] = key;
+                await highlightLine(9);
+                drawArray([j + 1]);
+                yield;
+            }
+        }
+
+        async function* shellSort() {
+            const n = array.length;
+            await highlightLine(2);
+            let gap = Math.floor(n / 2);
+            await highlightLine(3);
+            while (gap > 0) {
+                await highlightLine(4);
+                for (let i = gap; i < n; i++) {
+                    await highlightLine(5);
+                    let temp = array[i];
+                    await highlightLine(6);
+                    let j = i;
+                    await highlightLine(7);
+                    while (j >= gap && compare(array[j - gap], temp) > 0) {
+                        await highlightLine(8);
+                        array[j] = array[j - gap];
+                        await highlightLine(9);
+                        drawArray([j, j - gap]);
+                        yield;
+                        j -= gap;
+                        await highlightLine(10);
+                    }
+                    array[j] = temp;
+                    await highlightLine(11);
+                    drawArray([j]);
+                    yield;
+                }
+                gap = Math.floor(gap / 2);
+                await highlightLine(12);
+            }
+        }
+
+        async function* selectionSort() {
+            const n = array.length;
+            await highlightLine(2);
+            for (let i = 0; i < n - 1; i++) {
+                await highlightLine(3);
+                let minIndex = i;
+                await highlightLine(4);
+                for (let j = i + 1; j < n; j++) {
+                    await highlightLine(5);
+                    if (compare(array[j], array[minIndex]) < 0) {
+                        await highlightLine(6);
+                        minIndex = j;
+                        await highlightLine(7);
+                    }
+                }
+                if (minIndex !== i) {
+                    await highlightLine(8);
+                    swap(i, minIndex);
+                    await highlightLine(9);
+                    drawArray([i, minIndex]);
+                    yield;
+                }
+            }
+        }
+
+        async function* heapSort() {
+            const n = array.length;
+            await highlightLine(2);
+            yield* buildMaxHeap();
+
+            for (let i = n - 1; i > 0; i--) {
+                await highlightLine(4);
+                swap(0, i);
+                await highlightLine(5);
+                drawArray([0, i]);
+                yield;
+                yield* heapify(0, i);
+            }
+        }
+
+        async function* buildMaxHeap() {
+            const n = array.length;
+            await highlightLine(9);
+            for (let i = Math.floor(n / 2) - 1; i >= 0; i--) {
+                await highlightLine(10);
+                yield* heapify(i, n);
+            }
+        }
+
+        async function* heapify(i, n) {
+            await highlightLine(13);
+            let largest = i;
+            let left = 2 * i + 1;
+            let right = 2 * i + 2;
+
+            if (left < n && compare(array[left], array[largest]) > 0) {
+                await highlightLine(16);
+                largest = left;
+            }
+
+            if (right < n && compare(array[right], array[largest]) > 0) {
+                await highlightLine(18);
+                largest = right;
+            }
+
+            if (largest !== i) {
+                await highlightLine(20);
+                swap(i, largest);
+                await highlightLine(21);
+                drawArray([i, largest]);
+                yield;
+                yield* heapify(largest, n);
+            }
+        }
+
+        function selectAlgorithm(algo) {
+            currentAlgo = algo;
+            document.querySelectorAll('.algo-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`[onclick="selectAlgorithm('${algo}')"]`).classList.add('active');
+            if (isSorting) {
+                stopSorting();
+            }
+            displayPseudoCode(algo);
+        }
+
+        function stopSorting() {
+            isSorting = false;
+            isPaused = false;
+            isStepMode = false;
+            if (currentSortingAlgorithm) {
+                currentSortingAlgorithm.return();
+            }
+            drawArray();
+            if (lastHighlightedLine) {
+                lastHighlightedLine.classList.remove("highlight");
+                lastHighlightedLine = null;
+            }
+        }
+
+        async function startSort() {
+            if (isSorting) return;
+            stopSorting();
+            isSorting = true;
+            isPaused = false;
+            isStepMode = false;
+            comparisonCount = 0;
+            swapCount = 0;
+
+            document.getElementById("pauseSort").textContent = "暂停排序";
+
+            startTime = performance.now();
+            switch (currentAlgo) {
+                case 'bubbleSort':
+                    currentSortingAlgorithm = bubbleSort();
+                    break;
+                case 'quickSort':
+                    currentSortingAlgorithm = quickSort();
+                    break;
+                case 'insertionSort':
+                    currentSortingAlgorithm = insertionSort();
+                    break;
+                case 'shellSort':
+                    currentSortingAlgorithm = shellSort();
+                    break;
+                case 'selectionSort':
+                    currentSortingAlgorithm = selectionSort();
+                    break;
+                case 'heapSort':
+                    currentSortingAlgorithm = heapSort();
+                    break;
+            }
+            
+            while (isSorting) {
+                if (isPaused) {
+                    await sleep(100);
+                    continue;
+                }
+                const result = await currentSortingAlgorithm.next();
+                if (result.done) {
+                    break;
+                }
+                if (isStepMode) {
+                    isPaused = true;
+                }
+                await sleep(10);
+            }
+
+            endSort();
+        }
+
+        function endSort() {
+            currentSortingAlgorithm = null;
+            endTime = performance.now();
+            let timeTaken = ((endTime - startTime) / 1000).toFixed(2);
+            sortTimes[currentAlgo] = timeTaken;
+            document.getElementById("execution-time").textContent = `${timeTaken} 秒`;
+            document.getElementById("comparison-count").textContent = comparisonCount;
+            document.getElementById("swap-count").textContent = swapCount;
+
+            if (lastHighlightedLine) {
+                lastHighlightedLine.classList.remove("highlight");
+                lastHighlightedLine = null;
+            }
+            updateComparisonChart();
+            isSorting = false;
+        }
+
+        function generateRandomData() {
+            let size = document.getElementById("sampleInput").value || 50;
+            array = Array.from({ length: size }, () => Math.floor(Math.random() * 100) + 1);
+            drawArray();
+        }
+
+        function useCustomData() {
+            const customInput = document.getElementById("custom-input").value;
+            array = customInput.split(',').map(Number).filter(n => !isNaN(n));
+            drawArray();
+        }
+
+        async function stepSort() {
+            if (!isSorting) {
+                startSort();
+            }
+            isStepMode = true;
+            isPaused = false;
+            if (currentSortingAlgorithm) {
+                await currentSortingAlgorithm.next();
+                isPaused = true;
+            }
+        }
+
+        function updateComparisonChart() {
+            const comparisonResultsEl = document.getElementById("comparisonResults");
+
+            comparisonResultsEl.innerHTML = '';
+
+            const ctx = document.createElement('canvas');
+            ctx.id = 'comparisonChart';
+            comparisonResultsEl.appendChild(ctx);
+
+            const labels = Object.keys(sortTimes);
+            const data = Object.values(sortTimes);
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '算法运行时间 (秒)',
+                        data: data,
+                        backgroundColor: 'rgba(160, 160, 160, 0.2)',
+                        borderColor: 'rgba(160, 160, 160, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        document.getElementById("startSort").addEventListener("click", startSort);
+        document.getElementById("randomData").addEventListener("click", generateRandomData);
+        document.getElementById("pauseSort").addEventListener("click", () => { 
+            isPaused = !isPaused;
+            document.getElementById("pauseSort").textContent = isPaused ? "继续排序" : "暂停排序";
+        });
+        document.getElementById("stepSort").addEventListener("click", stepSort);
+        document.getElementById("useCustomData").addEventListener("click", useCustomData);
+        document.getElementById("speedControl").addEventListener("input", (e) => {
+            animationSpeed = parseInt(e.target.value);
+        });
+
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            drawArray();
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('load', () => {
+            resizeCanvas();
+            selectAlgorithm('bubbleSort');
+            generateRandomData();
+        });
+    </script>
+</body>
+</html>
